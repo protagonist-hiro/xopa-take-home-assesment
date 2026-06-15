@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mock Comm Service — Debug Console</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0d1117;
+      --surface:  #161b22;
+      --border:   #30363d;
+      --text:     #c9d1d9;
+      --muted:    #8b949e;
+      --accent:   #58a6ff;
+      --green:    #3fb950;
+      --yellow:   #d29922;
+      --orange:   #f0883e;
+      --red:      #f85149;
+      --purple:   #bc8cff;
+      --radius:   6px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 14px;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── HEADER ──────────────────────────────────────────────────────── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 15px; font-weight: 600; color: var(--accent); white-space: nowrap; }
+    .cfg-row { display: flex; align-items: center; gap: 8px; flex: 1; flex-wrap: wrap; }
+    .cfg-row label { color: var(--muted); font-size: 12px; white-space: nowrap; }
+    .cfg-row input {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      padding: 4px 8px;
+      font-size: 13px;
+    }
+    #urlInput  { width: 200px; }
+    #keyInput  { width: 160px; }
+
+    /* ── MAIN GRID ───────────────────────────────────────────────────── */
+    .grid {
+      display: grid;
+      grid-template-columns: 280px 1fr 320px;
+      grid-template-rows: 1fr;
+      flex: 1;
+      overflow: hidden;
+      gap: 0;
+    }
+
+    .panel {
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .panel:last-child { border-right: none; }
+
+    .panel-header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+
+    .panel-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+    }
+
+    /* ── FORMS ───────────────────────────────────────────────────────── */
+    .form-group { margin-bottom: 10px; }
+    .form-group label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+    .form-group input, .form-group textarea {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      padding: 6px 8px;
+      font-size: 13px;
+      font-family: inherit;
+    }
+    .form-group textarea { resize: vertical; height: 60px; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border: 1px solid transparent;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity .15s;
+    }
+    .btn:hover { opacity: .85; }
+    .btn-primary { background: var(--accent); color: #000; }
+    .btn-secondary { background: var(--surface); border-color: var(--border); color: var(--text); }
+    .btn-sm { padding: 3px 8px; font-size: 12px; }
+
+    .btn-row { display: flex; gap: 8px; margin-top: 4px; }
+
+    /* ── METRICS ─────────────────────────────────────────────────────── */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .metric-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+    }
+    .metric-card .value { font-size: 24px; font-weight: 700; color: var(--accent); }
+    .metric-card .label { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    /* ── CALL CARDS ──────────────────────────────────────────────────── */
+    .call-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: border-color .15s;
+    }
+    .call-card:hover { border-color: var(--accent); }
+    .call-card.selected { border-color: var(--accent); background: #1c2333; }
+
+    .call-card-row { display: flex; align-items: center; justify-content: space-between; }
+    .call-id { font-size: 11px; color: var(--muted); font-family: monospace; }
+    .call-route { font-size: 13px; font-weight: 500; margin: 4px 0; }
+    .call-meta { font-size: 11px; color: var(--muted); }
+    .call-rec { font-size: 11px; color: var(--green); margin-top: 4px; word-break: break-all; }
+    .call-audio {
+      width: 100%;
+      margin-top: 6px;
+      height: 28px;
+    }
+
+    /* ── STATUS BADGES ───────────────────────────────────────────────── */
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .badge-queued    { background: #21262d; color: var(--muted);   border: 1px solid var(--border); }
+    .badge-ringing   { background: #2d2208; color: var(--yellow);  border: 1px solid var(--yellow); }
+    .badge-answered  { background: #0d2818; color: var(--green);   border: 1px solid var(--green);  }
+    .badge-unanswered{ background: #2d1414; color: var(--orange);  border: 1px solid var(--orange); }
+    .badge-completed { background: #1a1040; color: var(--purple);  border: 1px solid var(--purple); }
+    .badge-error     { background: #2d0a0a; color: var(--red);     border: 1px solid var(--red);    }
+
+    /* ── LOG ─────────────────────────────────────────────────────────── */
+    .log-container {
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    .log-entry { padding: 2px 0; border-bottom: 1px solid #1c2129; }
+    .log-time  { color: var(--muted); margin-right: 6px; }
+    .log-badge { margin-right: 6px; }
+    .log-msg   { color: var(--text); }
+    .log-state { color: var(--accent); font-weight: 600; }
+    .log-err   { color: var(--red); }
+    .log-info  { color: var(--muted); }
+    .log-ok    { color: var(--green); }
+
+    /* ── FOOTER ──────────────────────────────────────────────────────── */
+    footer {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      padding: 6px 16px;
+      font-size: 11px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+    #statusDot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      margin-right: 4px;
+    }
+
+    /* ── SCROLLBAR ───────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* ── SECTION DIVIDER ─────────────────────────────────────────────── */
+    .section-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: var(--muted);
+      margin: 12px 0 6px;
+    }
+
+    .empty-state {
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 32px;
+    }
+
+  </style>
+</head>
+<body>
+
+<!-- ── HEADER ──────────────────────────────────────────────────────────── -->
+<header>
+  <h1>📞 Mock Comm Service</h1>
+  <div class="cfg-row">
+    <label>Base URL</label>
+    <input id="urlInput" type="text" value="http://localhost:8000" />
+    <label>API Key</label>
+    <input id="keyInput" type="text" value="test-key-1" />
+    <button class="btn btn-secondary btn-sm" onclick="fetchMetrics()">⟳ Metrics</button>
+    <button class="btn btn-secondary btn-sm" onclick="clearLog()">🗑 Clear Log</button>
+  </div>
+</header>
+
+<!-- ── MAIN GRID ────────────────────────────────────────────────────────── -->
+<div class="grid">
+
+  <!-- LEFT — Initiate Call + Metrics -->
+  <div class="panel">
+    <div class="panel-header">Initiate Call</div>
+    <div class="panel-body">
+      <div class="form-group">
+        <label>From (number)</label>
+        <input id="fromInput" type="text" value="+15550001111" />
+      </div>
+      <div class="form-group">
+        <label>To (number)</label>
+        <input id="toInput" type="text" value="+15559998888" />
+      </div>
+      <div class="form-group">
+        <label>Metadata (JSON, optional)</label>
+        <textarea id="metaInput">{"campaign": "demo"}</textarea>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="initiateCall()">▶ Initiate Call</button>
+      </div>
+
+      <div class="section-title" style="margin-top:20px">Metrics</div>
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="value" id="mActive">—</div>
+          <div class="label">Active Calls</div>
+        </div>
+        <div class="metric-card">
+          <div class="value" id="mTotal">—</div>
+          <div class="label">Total Calls</div>
+        </div>
+        <div class="metric-card">
+          <div class="value" id="mCompleted">—</div>
+          <div class="label">Completed</div>
+        </div>
+        <div class="metric-card">
+          <div class="value" id="mUploads">—</div>
+          <div class="label">Pending Uploads</div>
+        </div>
+      </div>
+
+      <div class="section-title">Lookup Call by ID</div>
+      <div class="form-group">
+        <input id="lookupId" type="text" placeholder="paste call_id…" />
+      </div>
+      <button class="btn btn-secondary" style="width:100%" onclick="lookupCall()">🔍 Fetch Call</button>
+    </div>
+  </div>
+
+  <!-- MIDDLE — Active calls list -->
+  <div class="panel">
+    <div class="panel-header">Active &amp; Recent Calls</div>
+    <div class="panel-body" id="callList">
+      <div class="empty-state">No calls yet. Initiate one →</div>
+    </div>
+  </div>
+
+  <!-- RIGHT — WebSocket event log -->
+  <div class="panel">
+    <div class="panel-header">Real-time WebSocket Log</div>
+    <div class="panel-body">
+      <div id="wsLog" class="log-container"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── FOOTER ───────────────────────────────────────────────────────────── -->
+<footer>
+  <span><span id="statusDot"></span> <span id="statusText">Ready</span></span>
+  <span id="footerWs">WebSocket connections: 0</span>
+  <span style="margin-left:auto">API: <span id="footerUrl">http://localhost:8000</span></span>
+</footer>
+
+<script>
+// ─── State ──────────────────────────────────────────────────────────────────
+const calls  = {};   // call_id → { data, ws }
+let wsCount  = 0;
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+function baseUrl()  { return document.getElementById('urlInput').value.replace(/\/$/, ''); }
+function apiKey()   { return document.getElementById('keyInput').value.trim(); }
+function authHdr()  { return { 'Authorization': `Bearer ${apiKey()}`, 'Content-Type': 'application/json' }; }
+function ts()       { return new Date().toLocaleTimeString(); }
+
+function statusBadge(s) {
+  const map = {
+    queued:     'badge-queued',
+    ringing:    'badge-ringing',
+    answered:   'badge-answered',
+    unanswered: 'badge-unanswered',
+    completed:  'badge-completed',
+  };
+  return `<span class="badge ${map[s] || 'badge-error'}">${s}</span>`;
+}
+
+function setStatus(msg, ok = true) {
+  document.getElementById('statusDot').style.background = ok ? 'var(--green)' : 'var(--red)';
+  document.getElementById('statusText').textContent = msg;
+}
+
+// ─── Log ────────────────────────────────────────────────────────────────────
+function logLine(callId, msg, cls = '') {
+  const el  = document.getElementById('wsLog');
+  const div = document.createElement('div');
+  div.className = 'log-entry';
+  const shortId = callId ? callId.slice(0, 8) + '…' : 'system';
+  div.innerHTML  = `<span class="log-time">${ts()}</span>`
+                 + `<span class="log-badge" style="color:var(--accent)">[${shortId}]</span>`
+                 + `<span class="log-msg ${cls}">${msg}</span>`;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+
+function clearLog() {
+  document.getElementById('wsLog').innerHTML = '';
+}
+
+// ─── Render calls list ───────────────────────────────────────────────────────
+function renderCalls() {
+  const el = document.getElementById('callList');
+  const ids = Object.keys(calls);
+  if (!ids.length) {
+    el.innerHTML = '<div class="empty-state">No calls yet. Initiate one →</div>';
+    return;
+  }
+  el.innerHTML = '';
+  // newest first
+  ids.slice().reverse().forEach(id => {
+    const c   = calls[id];
+    const div = document.createElement('div');
+    div.className = `call-card${c.selected ? ' selected' : ''}`;
+    div.id = `card-${id}`;
+    div.onclick = () => selectCall(id);
+
+    const recHtml = c.data.recording_url
+      ? `<div class="call-rec">🎙 <a href="${c.data.recording_url}" target="_blank" style="color:var(--green)">${c.data.recording_url}</a></div>
+         <audio class="call-audio" controls preload="metadata" src="${c.data.recording_url}"></audio>`
+      : '';
+
+    div.innerHTML = `
+      <div class="call-card-row">
+        <span class="call-id">${id.slice(0, 8)}…</span>
+        ${statusBadge(c.data.status || 'queued')}
+      </div>
+      <div class="call-route">${c.data.from_number || '?'} → ${c.data.to_number || '?'}</div>
+      <div class="call-meta">${c.data.created_at ? new Date(c.data.created_at).toLocaleTimeString() : ''}</div>
+      ${recHtml}
+    `;
+    el.appendChild(div);
+  });
+  document.getElementById('footerWs').textContent = `WebSocket connections: ${wsCount}`;
+}
+
+function updateCard(id, patch) {
+  if (!calls[id]) return;
+  Object.assign(calls[id].data, patch);
+  renderCalls();
+}
+
+function selectCall(id) {
+  Object.keys(calls).forEach(k => { calls[k].selected = false; });
+  calls[id].selected = true;
+  renderCalls();
+  document.getElementById('lookupId').value = id;
+}
+
+// ─── WebSocket per call ──────────────────────────────────────────────────────
+function connectWs(callId) {
+  const wsBase = baseUrl().replace(/^http/, 'ws');
+  const url    = `${wsBase}/ws/${callId}`;
+  const ws     = new WebSocket(url);
+
+  ws.onopen = () => {
+    wsCount++;
+    logLine(callId, `WS connected`, 'log-ok');
+    renderCalls();
+  };
+
+  ws.onmessage = ({ data }) => {
+    let evt;
+    try { evt = JSON.parse(data); } catch { return; }
+
+    if (evt.event === 'ping') return;
+
+    if (evt.event === 'current_state') {
+      updateCard(callId, { status: evt.status });
+      logLine(callId, `current state: ${evt.status}`, 'log-info');
+      return;
+    }
+
+    if (evt.event === 'state_change') {
+      const arrow = `${evt.from_state} → <span class="log-state">${evt.to_state}</span>`;
+      logLine(callId, arrow);
+      updateCard(callId, { status: evt.to_state });
+
+      if (evt.to_state === 'completed') {
+        // Poll for recording URL
+        setTimeout(() => pollRecording(callId), 3000);
+        setTimeout(() => pollRecording(callId), 8000);
+        setTimeout(() => pollRecording(callId), 15000);
+      }
+    }
+  };
+
+  ws.onclose  = () => { wsCount--; logLine(callId, 'WS closed', 'log-info'); renderCalls(); };
+  ws.onerror  = () => logLine(callId, 'WS error', 'log-err');
+
+  calls[callId].ws = ws;
+}
+
+// ─── Poll for recording URL after completion ─────────────────────────────────
+async function pollRecording(callId) {
+  try {
+    const r = await fetch(`${baseUrl()}/calls/${callId}`, { headers: authHdr() });
+    if (!r.ok) return;
+    const d = await r.json();
+    if (d.recording_url) {
+      updateCard(callId, { recording_url: d.recording_url });
+      logLine(callId, `🎙 recording ready`, 'log-ok');
+      fetchMetrics();
+    }
+  } catch { /* silent */ }
+}
+
+// ─── Initiate Call ───────────────────────────────────────────────────────────
+async function initiateCall() {
+  const from = document.getElementById('fromInput').value.trim();
+  const to   = document.getElementById('toInput').value.trim();
+  let meta   = {};
+  try { meta = JSON.parse(document.getElementById('metaInput').value || '{}'); } catch { /* ignore */ }
+
+  if (!from || !to) { alert('From and To are required.'); return; }
+
+  setStatus('Initiating call…');
+  try {
+    const res = await fetch(`${baseUrl()}/calls`, {
+      method:  'POST',
+      headers: authHdr(),
+      body:    JSON.stringify({ from, to, metadata: meta }),
+    });
+    const body = await res.json();
+
+    if (!res.ok) {
+      setStatus(`Error ${res.status}: ${JSON.stringify(body)}`, false);
+      logLine(null, `POST /calls → ${res.status} ${JSON.stringify(body)}`, 'log-err');
+      return;
+    }
+
+    const id = body.call_id;
+    calls[id] = { data: body, ws: null, selected: true };
+    // deselect others
+    Object.keys(calls).forEach(k => { if (k !== id) calls[k].selected = false; });
+
+    setStatus(`Call initiated: ${id.slice(0, 8)}…`);
+    logLine(id, `initiated (queued)`, 'log-ok');
+    document.getElementById('lookupId').value = id;
+    renderCalls();
+    connectWs(id);
+    fetchMetrics();
+  } catch (e) {
+    setStatus('Network error', false);
+    logLine(null, `Network error: ${e.message}`, 'log-err');
+  }
+}
+
+// ─── Lookup Call ─────────────────────────────────────────────────────────────
+async function lookupCall() {
+  const id = document.getElementById('lookupId').value.trim();
+  if (!id) return;
+  setStatus('Fetching call…');
+  try {
+    const res  = await fetch(`${baseUrl()}/calls/${id}`, { headers: authHdr() });
+    const body = await res.json();
+    if (!res.ok) {
+      setStatus(`Error ${res.status}`, false);
+      logLine(id, `GET /calls/${id.slice(0,8)} → ${res.status}`, 'log-err');
+      return;
+    }
+    if (!calls[id]) calls[id] = { data: {}, ws: null, selected: true };
+    Object.assign(calls[id].data, body);
+    calls[id].selected = true;
+    Object.keys(calls).forEach(k => { if (k !== id) calls[k].selected = false; });
+    setStatus('Call fetched');
+    logLine(id, `fetched → status: ${body.status}`, 'log-ok');
+    renderCalls();
+
+    // Offer to connect WS if not already connected
+    if (!calls[id].ws || calls[id].ws.readyState > 1) {
+      connectWs(id);
+    }
+  } catch (e) {
+    setStatus('Network error', false);
+    logLine(id, `Network error: ${e.message}`, 'log-err');
+  }
+}
+
+// ─── Metrics ─────────────────────────────────────────────────────────────────
+async function fetchMetrics() {
+  try {
+    const res  = await fetch(`${baseUrl()}/metrics`, { headers: authHdr() });
+    if (!res.ok) return;
+    const data = await res.json();
+    document.getElementById('mActive').textContent    = data.active_calls    ?? '—';
+    document.getElementById('mTotal').textContent     = data.total_calls     ?? '—';
+    document.getElementById('mCompleted').textContent = data.completed_calls ?? '—';
+    document.getElementById('mUploads').textContent   = data.pending_uploads ?? '—';
+    document.getElementById('footerUrl').textContent  = baseUrl();
+  } catch { /* silent */ }
+}
+
+// ─── Auto-refresh metrics every 5 s ─────────────────────────────────────────
+setInterval(fetchMetrics, 5000);
+
+// ─── Update footer URL on input change ──────────────────────────────────────
+document.getElementById('urlInput').addEventListener('input', () => {
+  document.getElementById('footerUrl').textContent = baseUrl();
+});
+
+// ─── Initial load ────────────────────────────────────────────────────────────
+fetchMetrics();
+logLine(null, 'Debug console ready. Set Base URL + API Key and initiate a call.', 'log-info');
+</script>
+</body>
+</html>
