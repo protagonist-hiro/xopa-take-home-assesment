@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.config import get_settings
+from app.config import get_cors_allow_origins, get_settings
 from app.database import init_db
 from app.redis_client import close_redis
 from app.routers import calls, metrics
@@ -19,6 +19,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 settings = get_settings()
+cors_allow_origins = get_cors_allow_origins()
 
 
 @asynccontextmanager
@@ -42,11 +43,11 @@ app = FastAPI(
 )
 
 # ---------------------------------------------------------------------------
-# CORS – allow the debug HTML served from any origin during development
+# CORS – configurable from environment for internet-facing deployments
 # ---------------------------------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

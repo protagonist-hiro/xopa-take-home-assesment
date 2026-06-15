@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     # Server
     SERVICE_PORT: int = 8000
 
+    # CORS (comma-separated origins, e.g. https://app.example.com,https://admin.example.com)
+    CORS_ALLOW_ORIGINS: str = "*"
+
     # Debug mode – serves /debug UI behind ADMIN_KEY when true
     DEBUG: bool = False
     ADMIN_KEY: str = ""
@@ -47,3 +50,12 @@ def get_settings() -> Settings:
 
 def get_valid_api_keys() -> List[str]:
     return [k.strip() for k in get_settings().VALID_API_KEYS.split(",")]
+
+
+def get_cors_allow_origins() -> List[str]:
+    raw = get_settings().CORS_ALLOW_ORIGINS.strip()
+    if not raw:
+        return []
+    if raw == "*":
+        return ["*"]
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
