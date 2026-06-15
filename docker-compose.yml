@@ -5,6 +5,8 @@ services:
     build: .
     ports:
       - "18080:18080"
+    networks:
+      - backend
     env_file: .env
     environment:
       - DATABASE_URL=postgresql+asyncpg://calluser:callpass@postgres:5432/calldb
@@ -44,6 +46,8 @@ services:
     volumes:
       - .:/app
     restart: unless-stopped
+    networks:
+      - backend
 
   postgres:
     image: postgres:16-alpine
@@ -58,8 +62,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-    ports:
-      - "5432:5432"
+    networks:
+      - backend
 
   redis:
     image: redis:7-alpine
@@ -71,8 +75,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-    ports:
-      - "6379:6379"
+    networks:
+      - backend
 
   minio:
     image: minio/minio:latest
@@ -82,9 +86,8 @@ services:
       MINIO_ROOT_PASSWORD: minioadmin
     volumes:
       - minio_data:/data
-    ports:
-      - "9000:9000"
-      - "9001:9001"
+    networks:
+      - backend
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 10s
@@ -103,8 +106,14 @@ services:
       mc anonymous set download myminio/recordings;
       exit 0;
       "
+    networks:
+      - backend
 
 volumes:
   postgres_data:
   redis_data:
   minio_data:
+
+networks:
+  backend:
+    driver: bridge
