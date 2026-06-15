@@ -250,7 +250,7 @@
   <h1>📞 Mock Comm Service</h1>
   <div class="cfg-row">
     <label>Base URL</label>
-    <input id="urlInput" type="text" value="http://localhost:8000" />
+    <input id="urlInput" type="text" value="" placeholder="Auto (same origin)" />
     <label>API Key</label>
     <input id="keyInput" type="text" value="test-key-1" />
     <button class="btn btn-secondary btn-sm" onclick="fetchMetrics()">⟳ Metrics</button>
@@ -340,7 +340,10 @@ const calls  = {};   // call_id → { data, ws }
 let wsCount  = 0;
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-function baseUrl()  { return document.getElementById('urlInput').value.replace(/\/$/, ''); }
+function baseUrl()  {
+  const v = document.getElementById('urlInput').value.trim();
+  return (v || window.location.origin).replace(/\/$/, '');
+}
 function apiKey()   { return document.getElementById('keyInput').value.trim(); }
 function authHdr()  { return { 'Authorization': `Bearer ${apiKey()}`, 'Content-Type': 'application/json' }; }
 function ts()       { return new Date().toLocaleTimeString(); }
@@ -562,11 +565,25 @@ async function fetchMetrics() {
   try {
     const res  = await fetch(`${baseUrl()}/metrics`, { headers: authHdr() });
     if (!res.ok) return;
-    const data = await res.json();
-    document.getElementById('mActive').textContent    = data.active_calls    ?? '—';
-    document.getElementById('mTotal').textContent     = data.total_calls     ?? '—';
-    document.getElementById('mCompleted').textContent = data.completed_calls ?? '—';
-    document.getElementById('mUploads').textContent   = data.pending_uploads ?? '—';
+    const contentType = (res.headers.get('content-type') || '').toLowerCase();
+
+    if (contentType.includes('application/json')) {
+      const data = await res.json();
+      document.getElementById('mActive').textContent    = data.active_calls    ?? '—';
+      document.getElementById('mTotal').textContent     = data.total_calls     ?? '—';
+      document.getElementById('mCompleted').textContent = data.completed_calls ?? '—';
+      document.getElementById('mUploads').textContent   = data.pending_uploads ?? '—';
+    } else {
+      const text = await res.text();
+      const getMetric = (name) => {
+        const m = text.match(new RegExp(`^${name}\\s+([0-9.]+)$`, 'm'));
+        return m ? m[1] : '—';
+      };
+      document.getElementById('mActive').textContent    = getMetric('comm_calls_active');
+      document.getElementById('mTotal').textContent     = getMetric('comm_calls_total');
+      document.getElementById('mCompleted').textContent = getMetric('comm_calls_completed_total');
+      document.getElementById('mUploads').textContent   = getMetric('comm_recording_uploads_pending');
+    }
     document.getElementById('footerUrl').textContent  = baseUrl();
   } catch { /* silent */ }
 }
@@ -580,6 +597,10 @@ document.getElementById('urlInput').addEventListener('input', () => {
 });
 
 // ─── Initial load ────────────────────────────────────────────────────────────
+if (!document.getElementById('urlInput').value.trim()) {
+  document.getElementById('urlInput').value = window.location.origin;
+}
+document.getElementById('footerUrl').textContent = baseUrl();
 fetchMetrics();
 logLine(null, 'Debug console ready. Set Base URL + API Key and initiate a call.', 'log-info');
 </script>
